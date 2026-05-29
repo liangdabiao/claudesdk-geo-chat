@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { ChatMessage, WSMessage } from "../types";
 
+function getChatId(): string {
+  let id = sessionStorage.getItem("geo_chat_id");
+  if (!id) {
+    id = uuid();
+    sessionStorage.setItem("geo_chat_id", id);
+  }
+  return id;
+}
+
 const WS_URL = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws`;
 
 export function useWebSocket() {
@@ -14,7 +23,7 @@ export function useWebSocket() {
   const connect = useCallback(() => {
     if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.close(); wsRef.current = null; }
     const ws = new WebSocket(WS_URL);
-    ws.onopen = () => { if (!mountedRef.current) { ws.close(); return; } setIsConnected(true); ws.send(JSON.stringify({ type: "subscribe", chatId: "default" })); };
+    ws.onopen = () => { if (!mountedRef.current) { ws.close(); return; } setIsConnected(true); ws.send(JSON.stringify({ type: "subscribe", chatId: getChatId() })); };
     ws.onclose = () => { setIsConnected(false); if (!mountedRef.current) return; reconnectRef.current = setTimeout(connect, 3000); };
     ws.onmessage = (event) => {
       const data: WSMessage = JSON.parse(event.data);
@@ -39,7 +48,7 @@ export function useWebSocket() {
     const fileNote = files?.length ? `\n\n已上传文件: ${files.map((f) => `${f.name} (${f.path})`).join(", ")}` : "";
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", content: content + (files?.length ? `\n📎 ${files.map((f) => f.name).join(", ")}` : ""), timestamp: Date.now(), files }]);
     setIsThinking(true);
-    wsRef.current.send(JSON.stringify({ type: "chat", chatId: "default", content: content + fileNote }));
+    wsRef.current.send(JSON.stringify({ type: "chat", chatId: getChatId(), content: content + fileNote }));
   }, []);
 
   return { messages, sendMessage, isConnected, isThinking };
